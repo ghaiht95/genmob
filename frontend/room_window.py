@@ -295,36 +295,33 @@ class RoomWindow(QtWidgets.QMainWindow):
         QMessageBox.information(self, "Game Started", "The game has started!")
 
     def leave_room(self):
-        print("[DEBUG] RoomWindow.closeEvent called")
+        print("[DEBUG] RoomWindow.leave_room called")
         
         if self.vpn_manager:
             self.vpn_manager.disconnect()
             self.lbl_vpn_info.setText("Not connected to VPN")
-        try:
-            self.socket.emit('leave', {
-                'room_id': self.room_data["room_id"],
-                'username': self.user_username
-            })
-        except Exception as e:
-            print(f"Error leaving room: {e}")
-        self.close()
-
-    def closeEvent(self, event):
-        # Stop the heartbeat timer
+        
+        # Stop the heartbeat timer before leaving
         if self.heartbeat_timer.isActive():
             self.heartbeat_timer.stop()
             
+        try:
+            if self.socket.connected:
+                self.socket.emit('leave', {
+                    'room_id': self.room_data["room_id"],
+                    'username': self.user_username
+                })
+                # Disconnect socket after sending leave event
+                self.socket.disconnect()
+        except Exception as e:
+            logger.error(f"Error leaving room: {e}")
+        self.close()
+
+    def closeEvent(self, event):
+        # Only handle VPN disconnection here
         if self.vpn_manager:
             self.vpn_manager.disconnect()
-        try:
-            self.socket.emit('leave', {
-                'room_id': self.room_data["room_id"],
-                'username': self.user_username
-            })
-            # self.socket.disconnect()
-        except Exception as e:
-            print(f"Error closing connection: {e}")
+        
         self.room_closed.emit()
         self.players.clear()
-
         event.accept()
