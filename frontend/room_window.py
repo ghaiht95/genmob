@@ -307,20 +307,46 @@ class RoomWindow(QtWidgets.QMainWindow):
             
         try:
             if self.socket.connected:
+                # Send leave event with is_last_player flag
+                players_left = len(self.players) - 1  # Subtract current player
+                is_last_player = players_left == 0
+                
                 self.socket.emit('leave', {
                     'room_id': self.room_data["room_id"],
-                    'username': self.user_username
+                    'username': self.user_username,
+                    'is_last_player': is_last_player
                 })
+                
+                # Wait for acknowledgment
+                time.sleep(1)
+                
                 # Disconnect socket after sending leave event
                 self.socket.disconnect()
+                
+                # Clear local data
+                self.players.clear()
+                self.room_closed.emit()
         except Exception as e:
             logger.error(f"Error leaving room: {e}")
-        self.close()
+        finally:
+            self.close()
 
     def closeEvent(self, event):
         # Only handle VPN disconnection here
         if self.vpn_manager:
             self.vpn_manager.disconnect()
+        
+        # Ensure we're disconnected from the room
+        try:
+            if self.socket.connected:
+                self.socket.emit('leave', {
+                    'room_id': self.room_data["room_id"],
+                    'username': self.user_username,
+                    'is_last_player': len(self.players) <= 1
+                })
+                self.socket.disconnect()
+        except Exception as e:
+            logger.error(f"Error in closeEvent: {e}")
         
         self.room_closed.emit()
         self.players.clear()

@@ -162,8 +162,38 @@ def leave_room():
             new_host.is_host = True
             room.owner_username = new_host.player_username
 
-    db.session.commit()
-    return jsonify(message="left"), 200
+    # إذا كان آخر لاعب، نقوم بحذف الغرفة
+    if players_left == 0:
+        logger.info(f"Room {room.id} is empty, cleaning up...")
+        try:
+            # حذف هاب VPN
+            hub_name = f"room_{room.id}"
+            vpn.delete_hub(hub_name)
+            logger.info(f"Deleted VPN hub: {hub_name}")
+
+            # حذف رسائل الدردشة
+            ChatMessage.query.filter_by(room_id=room.id).delete()
+            logger.info(f"Deleted chat messages for room: {room.id}")
+
+            # حذف الغرفة
+            db.session.delete(room)
+            logger.info(f"Deleted room: {room.id}")
+        except Exception as e:
+            logger.error(f"Error cleaning up room {room.id}: {e}")
+            return jsonify({"error": "Failed to clean up room"}), 500
+
+    try:
+        db.session.commit()
+        logger.info(f"Player {data['username']} successfully left room {data['room_id']}")
+        return jsonify({
+            "message": "left",
+            "is_last_player": players_left == 0,
+            "players_left": players_left
+        }), 200
+    except Exception as e:
+        logger.error(f"Error committing changes: {e}")
+        db.session.rollback()
+        return jsonify({"error": "Database error"}), 500
 
 @rooms_bp.route('/rooms', methods=['GET'])
 def get_rooms():

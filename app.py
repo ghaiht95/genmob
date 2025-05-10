@@ -351,8 +351,10 @@ def handle_join(data):
 def handle_leave(data):
     room_id = str(data['room_id'])
     username = data['username']
-    leave_room(room_id)
-
+    is_last_player = data.get('is_last_player', False)
+    
+    print(f"[DEBUG] Player {username} leaving room {room_id}, is_last_player: {is_last_player}")
+    
     # Remove the player's session
     if request.sid in player_sessions:
         del player_sessions[request.sid]
@@ -373,7 +375,7 @@ def handle_leave(data):
             if room:
                 room.current_players = players_left
                 
-                if players_left == 0:
+                if is_last_player or players_left == 0:
                     # حذف هاب VPN عند خروج آخر لاعب
                     hub_name = f"room_{room_id}"
                     print(f"Deleting VPN hub: {hub_name} - Room is empty")
@@ -388,9 +390,14 @@ def handle_leave(data):
                                 "username": username,
                                 "is_last_player": True
                             },
-                            timeout=5  # timeout de 5 segundos para evitar bloqueos
+                            timeout=5
                         )
                         print(f"✅ Room {room_id} cleaned up via API, status: {response.status_code}")
+                        
+                        # حذف الغرفة من قاعدة البيانات
+                        ChatMessage.query.filter_by(room_id=room_id).delete()
+                        db.session.delete(room)
+                        print(f"✅ Room {room_id} deleted from database")
                     except Exception as e:
                         print(f"❌ Error calling cleanup API: {e}")
                         # يمكن إضافة تنظيف يدوي هنا
@@ -416,12 +423,20 @@ def handle_leave(data):
             emit('error', {'message': 'Database error'}, room=room_id)
             return
 
+    # إرسال إشعارات للاعبين الآخرين
     emit('user_left', {'username': username}, room=room_id)
 
-    # الآن لما نحدث اللاعبين، نسترجعهم من القاعدة
+    # تحديث قائمة اللاعبين
     players = get_players_for_room(room_id)
     print(f"Players for room {room_id}: {players}")
     emit('update_players', {'players': players}, room=room_id)
+    
+    # إذا كانت الغرفة فارغة، نقوم بتحديث قائمة الغرف للجميع
+    if is_last_player or (room and room.current_players == 0):
+        emit('rooms_updated', broadcast=True)
+        
+    # إرسال تأكيد للمستخدم الذي غادر
+    emit('leave_confirmed', {'status': 'success'}, room=request.sid)
 
 
 # حدث انقطاع الاتصال
