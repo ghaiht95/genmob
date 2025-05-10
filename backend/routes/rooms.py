@@ -251,13 +251,13 @@ def leave_room():
 
                 hub_name = f"room_{room.id}"
                 
-                # حذف مستخدم VPN أولاً قبل أي عمليات قاعدة بيانات
+                # حذف مستخدم VPN في جميع الحالات
                 if rp:
                     logger.info(f"Deleting VPN user: {rp.username} from hub: {hub_name}")
                     if not vpn.delete_user(hub_name, rp.username):
                         logger.error(f"Failed to delete VPN user: {rp.username} from hub: {hub_name}")
 
-                # إذا كان آخر لاعب، نحذف الهاب VPN قبل عمليات قاعدة البيانات
+                # إذا كان آخر لاعب، نحذف الهاب VPN
                 if is_last_player:
                     logger.info(f"Last player left room {room.id} - cleaning up room")
                     logger.info(f"Deleting VPN hub: {hub_name}")
@@ -284,7 +284,7 @@ def leave_room():
                         session.flush()
                         logger.info(f"Successfully deleted room {room.id} and its chat messages")
                     else:
-                        # إذا لم نكن متأكدين، نتحقق من عدد اللاعبين المتبقين
+                        # تحديث عدد اللاعبين المتبقين
                         players_left = session.query(RoomPlayer).filter_by(room_id=room.id).count()
                         room.current_players = players_left
 

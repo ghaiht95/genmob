@@ -213,8 +213,23 @@
     "ui.verify_window.title_reset": "Password Reset",
     "ui.verify_window.code_label": "Enter the code sent to your email:",
     "ui.verify_window.verify_button": "Verify",
+    "ui.verify_window.resend_button": "Resend Code",
     "ui.verify_window.enter_code": "Please enter the code.",
     "ui.verify_window.success": "Verification successful!",
     "ui.verify_window.invalid_code": "Invalid code",
-    "ui.verify_window.server_error": "Server error: {error}"
+    "ui.verify_window.server_error": "Server error: {error}",
+    "ui.verify_window.resend_success": "Code resent successfully!",
+    "ui.verify_window.resend_failed": "Failed to resend code",
+    
+    "ui.reset_password.title": "Reset Password",
+    "ui.reset_password.new_password": "New Password:",
+    "ui.reset_password.confirm_password": "Confirm Password:",
+    "ui.reset_password.submit_button": "Save",
+    "ui.reset_password.new_password_placeholder": "Enter new password",
+    "ui.reset_password.confirm_password_placeholder": "Confirm new password",
+    "ui.reset_password.fill_all_fields": "Please fill in all fields.",
+    "ui.reset_password.passwords_not_match": "Passwords do not match.",
+    "ui.reset_password.success": "Password changed successfully.",
+    "ui.reset_password.failed": "Failed to reset password.",
+    "ui.reset_password.server_error": "Server error: {error}"
 } 

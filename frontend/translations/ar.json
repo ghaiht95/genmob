@@ -140,6 +140,32 @@
             "private_room": "هذه الغرفة خاصة",
             "error_joining": "خطأ في الانضمام: {error}",
             "error_creating": "خطأ في الإنشاء: {error}\nتفاصيل الخادم: {details}"
+        },
+        "verify_window": {
+            "title_verify": "التحقق من الحساب",
+            "title_reset": "إعادة تعيين كلمة المرور",
+            "code_label": "أدخل الرمز المرسل إلى بريدك الإلكتروني:",
+            "verify_button": "تحقق",
+            "resend_button": "إعادة إرسال الكود",
+            "enter_code": "الرجاء إدخال الرمز.",
+            "success": "تم التحقق بنجاح!",
+            "invalid_code": "الرمز غير صحيح",
+            "server_error": "خطأ في الخادم: {error}",
+            "resend_success": "تم إعادة إرسال الرمز بنجاح!",
+            "resend_failed": "فشل في إعادة إرسال الرمز"
+        },
+        "reset_password": {
+            "title": "إعادة تعيين كلمة المرور",
+            "new_password": "كلمة المرور الجديدة:",
+            "confirm_password": "تأكيد كلمة المرور:",
+            "submit_button": "حفظ",
+            "new_password_placeholder": "أدخل كلمة المرور الجديدة",
+            "confirm_password_placeholder": "أكد كلمة المرور الجديدة",
+            "fill_all_fields": "الرجاء ملء جميع الحقول.",
+            "passwords_not_match": "كلمات المرور غير متطابقة.",
+            "success": "تم تغيير كلمة المرور بنجاح.",
+            "failed": "فشل في إعادة تعيين كلمة المرور.",
+            "server_error": "خطأ في الخادم: {error}"
         }
     },
     "widgets": {
