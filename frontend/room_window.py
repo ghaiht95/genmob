@@ -156,11 +156,11 @@ class RoomWindow(QtWidgets.QMainWindow):
         self.list_players = self.findChild(QtWidgets.QListWidget, 'list_players')
         if self.vpn_manager:
             self.lbl_vpn_info.setText(f"Hub: {self.room_data['vpn_info']['hub']}")
-            # الاتصال التلقائي عند فتح النافذة
+            # Auto-connect when window opens
             if self.vpn_manager.connect():
-                self.lbl_vpn_info.setText("متصل بـ VPN")
+                self.lbl_vpn_info.setText("Connected to VPN")
             else:
-                QMessageBox.critical(self, "خطأ", "فشل الاتصال بـ VPN")
+                QMessageBox.critical(self, "Error", "Failed to connect to VPN")
 
     def setup_connections(self):
         print("[DEBUG] RoomWindow.setup_connections called")
@@ -168,7 +168,7 @@ class RoomWindow(QtWidgets.QMainWindow):
         self.chat_input.returnPressed.connect(self.send_message)
         self.btn_leave.clicked.connect(self.leave_room)
         self.btn_start.clicked.connect(self.start_game)
-        # تم حذف أزرار الاتصال والقطع من الربط
+        # Removed connect/disconnect buttons from binding
         # self.btn_connect_vpn.clicked.connect(self.connect_vpn)
         # self.btn_disconnect_vpn.clicked.connect(self.disconnect_vpn)
 
@@ -183,12 +183,12 @@ class RoomWindow(QtWidgets.QMainWindow):
     def on_socket_connect(self):
         print("[DEBUG] RoomWindow.on_socket_connect called")
         logger.info("Socket.IO connected")
-        self.chat_display.append("🟢 تم الاتصال بالخادم")
+        self.chat_display.append("🟢 Connected to server")
 
     def on_socket_disconnect(self):
         print("[DEBUG] RoomWindow.on_socket_disconnect called")
         logger.warning("Socket.IO disconnected")
-        self.chat_display.append("🔴 انقطع الاتصال بالخادم")
+        self.chat_display.append("🔴 Disconnected from server")
     
     def send_heartbeat(self):
         print("[DEBUG] RoomWindow.send_heartbeat called")
@@ -208,13 +208,13 @@ class RoomWindow(QtWidgets.QMainWindow):
             if not self.socket.connected:
                 self.socket.connect(API_BASE_URL)
             
-            # أرسل بيانات الانضمام في كل الحالات
+            # Send join data in all cases
             self.socket.emit('join', {
                 'room_id': self.room_data["room_id"],
                 'username': self.user_username
             })
         except Exception as e:
-            QMessageBox.critical(self, "خطأ في الاتصال", f"فشل الاتصال بالخادم: {e}")
+            QMessageBox.critical(self, "Connection Error", f"Failed to connect to server: {e}")
             self.close()
 
     def connect_vpn(self):
@@ -224,7 +224,7 @@ class RoomWindow(QtWidgets.QMainWindow):
     def disconnect_vpn(self):
         if self.vpn_manager:
             self.vpn_manager.disconnect()
-            self.lbl_vpn_info.setText("غير متصل بـ VPN")
+            self.lbl_vpn_info.setText("Not connected to VPN")
 
     def send_message(self):
         print("[DEBUG] RoomWindow.send_message called")
@@ -257,7 +257,7 @@ class RoomWindow(QtWidgets.QMainWindow):
     def on_user_joined(self, data):
         print("[DEBUG] RoomWindow.on_user_joined called")
         username = data['username']
-        self.chat_display.append(f"🟢 {username} انضم إلى الغرفة")
+        self.chat_display.append(f"🟢 {username} joined the room")
         if username not in self.players:
             self.players.append(username)
             self.update_players_list()
@@ -265,26 +265,25 @@ class RoomWindow(QtWidgets.QMainWindow):
     def on_user_left(self, data):
         print("[DEBUG] RoomWindow.on_receive_message called")
         username = data['username']
-        self.chat_display.append(f"🔴 {username} غادر الغرفة")
+        self.chat_display.append(f"🔴 {username} left the room")
         if username in self.players:
             self.players.remove(username)
             self.update_players_list()
 
     def on_players_update(self, data):
-        logger.info(f"تحديث قائمة اللاعبين: {data}")
+        logger.info(f"Updating player list: {data}")
         self.players = data.get('players', [])
-        logger.info(f"اللاعبون في الغرفة: {self.players}")
+        logger.info(f"Players in room: {self.players}")
         self.update_players_list()
 
     def update_players_list(self):
         print("[DEBUG] RoomWindow.on_players_update called")
         self.list_players.clear()
-        logger.info(f"تحديث واجهة قائمة اللاعبين: {len(self.players)} لاعبين")
+        logger.info(f"Updating player list UI: {len(self.players)} players")
         for player in self.players:
             self.list_players.addItem(f"🟢 {player}")
-        # self.setWindowTitle(f"غرفة اللعب - {len(self.players)} لاعبين")
-        # إضافة رسالة في الشات عند تحديث قائمة اللاعبين
-        self.chat_display.append(f"📋 تم تحديث قائمة اللاعبين: {', '.join(self.players)}")
+        # Add message in chat when player list is updated
+        self.chat_display.append(f"📋 Player list updated: {', '.join(self.players)}")
 
     def start_game(self):
         try:
@@ -293,14 +292,14 @@ class RoomWindow(QtWidgets.QMainWindow):
             print(f"Error starting game: {e}")
 
     def on_game_started(self, data):
-        QMessageBox.information(self, "بدء اللعبة", "تم بدء اللعبة!")
+        QMessageBox.information(self, "Game Started", "The game has started!")
 
     def leave_room(self):
         print("[DEBUG] RoomWindow.closeEvent called")
         
         if self.vpn_manager:
             self.vpn_manager.disconnect()
-            self.lbl_vpn_info.setText("غير متصل بـ VPN")
+            self.lbl_vpn_info.setText("Not connected to VPN")
         try:
             self.socket.emit('leave', {
                 'room_id': self.room_data["room_id"],
