@@ -243,21 +243,23 @@ class RoomWindow(QtWidgets.QMainWindow):
                     'username': self.user_username,
                     'message': message
                 })
+                # عرض الرسالة في المحادثة
                 self.chat_display.append(f"أنت: {message}")
                 self.chat_input.clear()
             except Exception as e:
                 print(f"Error sending message: {e}")
+                self.chat_display.append("❌ Error sending message")
 
     def on_receive_message(self, data):
         print("[DEBUG] RoomWindow.on_receive_message called")
-        username = data['sender']
-        message = data['message']
-        time = data.get('time', '')
+        username = data.get('username', 'Anonymous')
+        message = data.get('message', '')
+        created_at = data.get('created_at', '')
         
         # عدم عرض الرسائل المرسلة من قبل المستخدم الحالي (لأنها تُعرض عند الإرسال)
         if username != self.user_username:
-            if time:
-                self.chat_display.append(f"[{time}] {username}: {message}")
+            if created_at:
+                self.chat_display.append(f"[{created_at}] {username}: {message}")
             else:
                 self.chat_display.append(f"{username}: {message}")
 

@@ -10,6 +10,11 @@ from routes.auth import auth_bp
 from routes.rooms import rooms_bp
 from routes.friends import friends_bp
 import requests
+import logging
+
+# إعداد السجلات
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -104,6 +109,7 @@ def handle_leave(data):
     player = RoomPlayer.query.filter_by(room_id=room_id, player_username=username).first()
     if player:
         is_host = player.is_host  # حفظ قيمة is_host قبل حذف اللاعب
+        vpn_username = player.username  # حفظ اسم مستخدم VPN قبل حذف اللاعب
         db.session.delete(player)
         try:
             db.session.flush()  # نستخدم flush بدلاً من commit للتحقق من عدد اللاعبين المتبقين
@@ -116,9 +122,20 @@ def handle_leave(data):
             if room:
                 room.current_players = players_left
                 
+                # حذف مستخدم VPN في جميع الحالات
+                hub_name = f"room_{room_id}"
+                try:
+                    from services.softether import SoftEtherVPN
+                    vpn = SoftEtherVPN()
+                    if vpn.delete_user(hub_name, vpn_username):
+                        print(f"✅ Successfully deleted VPN user {vpn_username} from hub {hub_name}")
+                    else:
+                        print(f"❌ Failed to delete VPN user {vpn_username} from hub {hub_name}")
+                except Exception as e:
+                    print(f"❌ Error deleting VPN user: {e}")
+                
                 if is_last_player or players_left == 0:
                     # حذف هاب VPN عند خروج آخر لاعب
-                    hub_name = f"room_{room_id}"
                     print(f"Deleting VPN hub: {hub_name} - Room is empty")
                     
                     try:
@@ -177,30 +194,57 @@ def handle_leave(data):
 # # كتابة رسالة
 @socketio.on('send_message')
 def handle_send_message(data):
-    room_id = str(data['room_id'])
-    sender = data.get('sender') or data.get('username')
-    message = data['message']
+    try:
+        room_id = data.get('room_id')
+        username = data.get('username')
+        message = data.get('message')
 
-    # التحقق من أن الرسالة غير فارغة
-    if not message or not sender:
-        emit('error', {'message': 'Message or sender cannot be empty'}, room=room_id)
-        return
+        print(f"Received message from {username} in room {room_id}: {message}")
 
-    # نسجل الرسالة في قاعدة البيانات
-    msg = ChatMessage(
-        room_id=room_id,
-        sender=sender,
-        message=message
-    )
-    db.session.add(msg)
-    db.session.commit()
+        if not all([room_id, username, message]):
+            print(f"Missing required fields in message data: {data}")
+            return {'error': 'Missing required fields'}
 
-    # نرسل الرسالة لكل الموجودين بالغرفة
-    emit('new_message', {
-        'sender': sender,
-        'message': message,
-        'time': msg.timestamp.strftime("%H:%M:%S")
-    }, room=room_id)
+        # التحقق من وجود الغرفة
+        room = Room.query.get(room_id)
+        if not room:
+            print(f"Room {room_id} not found")
+            return {'error': 'Room not found'}
+
+        # التحقق من وجود اللاعب في الغرفة
+        player = RoomPlayer.query.filter_by(room_id=room_id, player_username=username).first()
+        if not player:
+            print(f"Player {username} not found in room {room_id}")
+            return {'error': 'Player not in room'}
+
+        # إنشاء رسالة جديدة
+        try:
+            msg = ChatMessage(
+                room_id=room_id,
+                username=username,
+                message=message
+            )
+            db.session.add(msg)
+            db.session.commit()
+
+            # إرسال الرسالة لجميع المستخدمين في الغرفة
+            emit('new_message', {
+                'id': msg.id,
+                'username': msg.username,
+                'message': msg.message,
+                'created_at': msg.created_at.isoformat()
+            }, room=room_id)
+
+            print(f"Message sent successfully from {username} in room {room_id}")
+            return {'status': 'success'}
+        except Exception as e:
+            print(f"Database error while creating message: {str(e)}")
+            db.session.rollback()
+            return {'error': 'Database error'}
+
+    except Exception as e:
+        print(f"Error in handle_send_message: {str(e)}")
+        return {'error': str(e)}
 
 def broadcast_rooms_update():
     """إرسال تحديث قائمة الغرف لجميع المستخدمين المتصلين"""
