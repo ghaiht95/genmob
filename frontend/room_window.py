@@ -128,6 +128,7 @@ class RoomWindow(QtWidgets.QMainWindow):
 
     def __init__(self, room_data, user_username):
         print("[DEBUG] RoomWindow.__init__ called")
+        print(f"[DEBUG] Room data: {room_data}")
 
         super().__init__()
         import os
@@ -136,7 +137,13 @@ class RoomWindow(QtWidgets.QMainWindow):
 
         self.room_data = room_data
         self.user_username = user_username
-        self.vpn_manager = VPNManager(room_data) if "vpn_info" in room_data else None
+        
+        # التحقق من وجود vpn_info
+        if "vpn_info" not in room_data:
+            print("[ERROR] vpn_info not found in room_data")
+            raise ValueError("vpn_info is required in room_data")
+            
+        self.vpn_manager = VPNManager(room_data)
         self.socket = socketio.Client()
         self.players = []
         

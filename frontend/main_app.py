@@ -127,21 +127,27 @@ class MainApp(QtWidgets.QMainWindow):
             return self.show_message(f"خطأ في الإنشاء: {e}")
 
         data = resp.json()
-        vpn_info = {
-            "hub": data["vpn_hub"],
-            "username": data["vpn_username"],
-            "password": data["vpn_password"],
-            "server_ip": data["server_ip"],
-            "port": data.get("port", 443)
-        }
-
-        info = {
+        
+        # إنشاء معلومات الغرفة الكاملة
+        room_info = {
             "room_id": data["room_id"],
+            "name": s["name"],
+            "description": s["description"],
+            "is_private": s["is_private"],
+            "max_players": s["max_players"],
+            "current_players": 1,
             "owner_username": self.user_data["username"],
-            "vpn_info": vpn_info
+            "vpn_info": {
+                "hub": data["vpn_hub"],
+                "username": data["vpn_username"],
+                "password": data["vpn_password"],
+                "server_ip": data["server_ip"],
+                "port": data.get("port", 443)
+            }
         }
+        
         self.update_rooms()
-        self.open_room(info)
+        self.open_room(room_info)
 
     def join_room_direct(self, room):
         if room.get("is_private"):
@@ -154,15 +160,23 @@ class MainApp(QtWidgets.QMainWindow):
             resp.raise_for_status()
             data = resp.json()
             
-            vpn_info = {
-                "hub": data["vpn_hub"],
-                "username": data["vpn_username"],
-                "password": data["vpn_password"],
-                "server_ip": data["server_ip"],
-                "port": data.get("port", 443)
-            }
-
-            room["vpn_info"] = vpn_info
+            # تحديث معلومات الغرفة
+            room.update({
+                "name": room.get("name", ""),
+                "description": room.get("description", ""),
+                "is_private": room.get("is_private", False),
+                "max_players": room.get("max_players", 8),
+                "current_players": room.get("current_players", 0),
+                "owner_username": room.get("owner_username", ""),
+                "vpn_info": {
+                    "hub": data["vpn_hub"],
+                    "username": data["vpn_username"],
+                    "password": data["vpn_password"],
+                    "server_ip": data["server_ip"],
+                    "port": data.get("port", 443)
+                }
+            })
+            
             self.open_room(room)
 
         except requests.exceptions.RequestException as e:
