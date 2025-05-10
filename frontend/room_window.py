@@ -1,161 +1,176 @@
-# room_window.py
-from PyQt5.QtCore import QTimer, QThread, pyqtSignal
+import sys
+import os
+import socketio
+import subprocess
+import time
+import logging
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QMessageBox
-import socketio
-import logging
-from vpn_manager import VPNManager
-from vpn_thread import VPNThread
-from translator import Translator, _
-import os 
-from progress_window import ProgressWindow  # استيراد نافذة شريط التحميل
+from PyQt5.QtCore import QMetaType, QTimer
+from PyQt5.QtGui import QTextCursor
 
-# إعداد التسجيل
+# إعداد السجلات
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logging.basicConfig(filename='room_log.txt', level=logging.DEBUG, 
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    logger.addHandler(console)
 
-API_BASE_URL = "http://31.220.80.192:5000"
+API_BASE_URL = "http://31.220.80.192:5000"  # رابط السيرفر
+
+# Register QTextCursor type
+
+class VPNManager:
+    def __init__(self, room_data):
+        print("[DEBUG] VPNManager.__init__ called")
+        self.room_data = room_data
+        self.tools_path = os.path.join(os.getcwd(), "tools")
+        self.vpncmd_path = os.path.join(self.tools_path, "vpncmd.exe")
+        self.vpnclient_path = os.path.join(self.tools_path, "vpnclient.exe")
+        self.nicname = "VPN"
+        self.account = f"room_{room_data['vpn_info']['hub']}"
+        self.server_ip = room_data['vpn_info']['server_ip']
+        self.port = room_data['vpn_info'].get('port', 443)
+        self.vpncmd_server = "localhost"
+
+    def _run_silent(self, cmd):
+        print("[DEBUG] VPNManager._run_silent called")
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+
+        CREATE_NO_WINDOW = 0x08000000
+
+        return subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW,
+            startupinfo=startupinfo,
+            shell=False
+        )
+
+    # def _check_service_exists(self):
+    #     result = subprocess.run(["sc", "query", "SEVPNCLIENT"], capture_output=True, text=True)
+    #     return "SERVICE_NAME: SEVPNCLIENT" in result.stdout
+
+    def _account_exists(self):
+        print("[DEBUG] VPNManager._account_exists called")
+
+        result = subprocess.run([
+            self.vpncmd_path, self.vpncmd_server, "/CLIENT", "/CMD", "AccountList"
+        ], capture_output=True, text=True)
+        return self.account in result.stdout
+
+    def connect(self):
+        print("[DEBUG] VPNManager.connect called")
+        try:
+            # 1. Register service (once)
+            # if not self._check_service_exists():
+            #     logger.info("Registering VPN Client service...")
+            #     self._run_silent([self.vpnclient_path, "/install"])
+
+            # 2. Start service using sc (no GUI ever)
+            logger.info("Starting VPN Client service silently...")
+            self._run_silent(["sc", "start", "SEVPNCLIENT"])
+
+            # 3. Create account if it doesn't exist
+            if not self._account_exists():
+                logger.info(f"Creating VPN account: {self.account}")
+                self._run_silent([
+                    self.vpncmd_path, self.vpncmd_server, "/CLIENT", "/CMD", "AccountCreate", self.account,
+                    f"/SERVER:{self.server_ip}:{self.port}",
+                    f"/HUB:{self.room_data['vpn_info']['hub']}",
+                    f"/USERNAME:{self.room_data['vpn_info']['username']}",
+                    f"/NICNAME:{self.nicname}"
+                ])
+                logger.info("Setting VPN password...")
+                self._run_silent([
+                    self.vpncmd_path, self.vpncmd_server, "/CLIENT", "/CMD", "AccountPasswordSet", self.account,
+                    f"/PASSWORD:{self.room_data['vpn_info']['password']}", "/TYPE:standard"
+                ])
+            else:
+                logger.info("VPN account already exists. Skipping creation.")
+
+            # 4. Connect
+            logger.info("Connecting to VPN...")
+            self._run_silent([
+                self.vpncmd_path, self.vpncmd_server, "/CLIENT", "/CMD", "AccountConnect", self.account
+            ])
+            logger.info("VPN connected successfully.")
+            return True
+
+        except Exception as e:
+            logger.error(f"[VPN] Unexpected error: {e}")
+            return False
+
+    def disconnect(self, cleanup=False):
+        print("[DEBUG] VPNManager.disconnect called")
+        try:
+            logger.info("Disconnecting from VPN...")
+            self._run_silent([
+                self.vpncmd_path, self.vpncmd_server, "/CLIENT", "/CMD", "AccountDisconnect", self.account
+            ])
+            self._run_silent([
+                self.vpncmd_path, self.vpncmd_server, "/CLIENT", "/CMD", "AccountDelete", self.account
+            ])
+
+            logger.info("VPN disconnected successfully.")
+
+            if cleanup:
+                logger.info("Cleaning up VPN service...")
+                self._run_silent(["sc", "stop", "SEVPNCLIENT"])
+                self._run_silent([self.vpnclient_path, "/uninstall"])
+                logger.info("VPN client service removed completely.")
+
+        except Exception as e:
+            logger.error(f"[VPN] Error during disconnection: {e}")
+
 class RoomWindow(QtWidgets.QMainWindow):
     room_closed = QtCore.pyqtSignal()
 
     def __init__(self, room_data, user_username):
-        super().__init__()
+        print("[DEBUG] RoomWindow.__init__ called")
 
-        # إعداد البيانات الأساسية
+        super().__init__()
+        import os
+        file_path = os.path.join(os.getcwd(), 'ui', 'room_window.ui')
+        self.ui = uic.loadUi(file_path, self)
+
         self.room_data = room_data
         self.user_username = user_username
+        self.vpn_manager = VPNManager(room_data) if "vpn_info" in room_data else None
         self.socket = socketio.Client()
         self.players = []
-        self.connection_timer = None
-
-        # Log room initiation
-        logger.info(f"Initializing room window for: {room_data.get('room_id', 'unknown')}")
-
-        # إعداد واجهة المستخدم
-        file_path = os.path.join(os.getcwd(), 'ui', 'room_window.ui')
-        try:
-            self.ui = uic.loadUi(file_path, self)
-            logger.info("UI loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load UI: {e}")
-            QtWidgets.QMessageBox.critical(None, "Error", f"Failed to load UI: {e}")
-            return
         
-        # إعداد نافذة شريط التحميل (نافذة واحدة فقط)
-        self.progress_window = ProgressWindow(self)
-        
-        # Setup UI before VPN connection
+        # إعداد مؤقت للنبضات heartbeat
+        self.heartbeat_timer = QTimer(self)
+        self.heartbeat_timer.timeout.connect(self.send_heartbeat)
+        self.heartbeat_timer.start(30000)  # إرسال نبضة كل 30 ثانية
+
         self.setup_ui()
         self.setup_connections()
-        self.setup_heartbeat()
-        
-        # إعداد مدير VPN مع تمرير نافذة التقدم
-        if "vpn_info" in room_data:
-            logger.info("VPN info found, creating VPN manager")
-            try:
-                self.vpn_manager = VPNManager(
-                    room_data,
-                    self.progress_window,
-                    on_connect_success=self.on_vpn_connected,
-                    on_disconnect_success=self.on_vpn_disconnected
-                )
-            except Exception as e:
-                logger.error(f"Failed to create VPN manager: {e}", exc_info=True)
-                QtWidgets.QMessageBox.critical(None, "Error", f"Failed to setup VPN: {e}")
-                return
-        else:
-            logger.info("No VPN info found")
-            self.vpn_manager = None
-
-        # Show the window immediately to provide visual feedback
-        self.show()
-        
-        # Start connection process
-        if self.vpn_manager:
-            logger.info("Starting VPN connection")
-            self.lbl_vpn_info.setText(_("ui.room.connecting_vpn", "جاري الاتصال بـ VPN..."))
-            # Add a timeout for VPN connection
-            self.connection_timer = QTimer(self)
-            self.connection_timer.setSingleShot(True)
-            self.connection_timer.timeout.connect(self.on_vpn_timeout)
-            self.connection_timer.start(60000)  # 60 second timeout
-            
-            self.progress_window.show_progress()
-            QtWidgets.QApplication.processEvents()  # Process UI events
-            
-            # Start VPN connection in a separate thread
-            self.vpn_manager.connect()
-        else:
-            logger.info("No VPN manager, connecting directly to server")
-            self.connect_to_server()
-
-    def on_vpn_timeout(self):
-        """Handler for VPN connection timeout"""
-        logger.error("VPN connection timed out")
-        self.progress_window.close_progress()
-        QtWidgets.QMessageBox.critical(self, "Connection Error", "VPN connection timed out. Please try again later.")
-        self.close()
+        self.connect_to_server()
 
     def setup_ui(self):
-        lang = Translator.get_instance().current_language
-        direction = QtCore.Qt.RightToLeft if lang == "ar" else QtCore.Qt.LeftToRight
-        self.setLayoutDirection(direction)
+        print("[DEBUG] RoomWindow.setup_ui called")
 
         self.chat_display.setReadOnly(True)
         self.list_players = self.findChild(QtWidgets.QListWidget, 'list_players')
-        self.lbl_vpn_info.setText(_("ui.room.vpn_info", "معلومات VPN"))
-        self.btn_send.setText(_("ui.room.send_button", "إرسال"))
-        self.btn_leave.setText(_("ui.room.leave_button", "مغادرة"))
-        self.btn_start.setText(_("ui.room.start_button", "بدء اللعبة"))
-
-    def setup_heartbeat(self):
-        """إعداد مؤقت نبض القلب"""
-        self.heartbeat_timer = QTimer(self)
-        self.heartbeat_timer.timeout.connect(self.send_heartbeat)
-        self.heartbeat_timer.start(30000)  # إرسال نبض كل 30 ثانية
-
-    def on_vpn_connected(self):
-        """يتم استدعاؤها عند نجاح الاتصال بـ VPN"""
-        logger.info("VPN connected successfully")
-        
-        # Cancel the timeout timer if it's running
-        if self.connection_timer and self.connection_timer.isActive():
-            self.connection_timer.stop()
-        
-        self.lbl_vpn_info.setText(_("ui.room.connected_vpn", "متصل بـ VPN"))
-        QtWidgets.QApplication.processEvents()  # Process UI events
-        self.connect_to_server()  # الاتصال بالخادم بعد VPN
-
-    def on_vpn_disconnected(self):
-        """يتم استدعاؤها عند نجاح قطع الاتصال بـ VPN"""
-        logger.info("VPN disconnected successfully")
-        self.close()  # إغلاق نافذة الغرفة
-
-    def connect_to_server(self):
-        logger.info("Connecting to server")
-        try:
-            self.socket.connect(API_BASE_URL)
-            self.socket.emit('join', {
-                'room_id': self.room_data["room_id"],
-                'username': self.user_username
-            })
-            self.chat_display.append("🟢 تم الاتصال بالخادم")
-            logger.info("Connected to server successfully")
-        except Exception as e:
-            logger.error(f"Failed to connect to server: {e}", exc_info=True)
-            QMessageBox.critical(self, "خطأ في الاتصال", f"فشل الاتصال بالخادم: {e}")
-            self.close()
+        if self.vpn_manager:
+            self.lbl_vpn_info.setText(f"Hub: {self.room_data['vpn_info']['hub']}")
+            # الاتصال التلقائي عند فتح النافذة
+            if self.vpn_manager.connect():
+                self.lbl_vpn_info.setText("متصل بـ VPN")
+            else:
+                QMessageBox.critical(self, "خطأ", "فشل الاتصال بـ VPN")
 
     def setup_connections(self):
+        print("[DEBUG] RoomWindow.setup_connections called")
         self.btn_send.clicked.connect(self.send_message)
         self.chat_input.returnPressed.connect(self.send_message)
         self.btn_leave.clicked.connect(self.leave_room)
         self.btn_start.clicked.connect(self.start_game)
+        # تم حذف أزرار الاتصال والقطع من الربط
+        # self.btn_connect_vpn.clicked.connect(self.connect_vpn)
+        # self.btn_disconnect_vpn.clicked.connect(self.disconnect_vpn)
 
         self.socket.on('new_message', self.on_receive_message)
         self.socket.on('user_joined', self.on_user_joined)
@@ -166,110 +181,151 @@ class RoomWindow(QtWidgets.QMainWindow):
         self.socket.on('disconnect', self.on_socket_disconnect)
 
     def on_socket_connect(self):
-        logger.info("Socket connected event")
+        print("[DEBUG] RoomWindow.on_socket_connect called")
+        logger.info("Socket.IO connected")
         self.chat_display.append("🟢 تم الاتصال بالخادم")
 
     def on_socket_disconnect(self):
-        logger.info("Socket disconnected event")
+        print("[DEBUG] RoomWindow.on_socket_disconnect called")
+        logger.warning("Socket.IO disconnected")
         self.chat_display.append("🔴 انقطع الاتصال بالخادم")
-
+    
     def send_heartbeat(self):
-        if self.socket.connected:
-            logger.debug("Sending heartbeat")
-            self.socket.emit('heartbeat', {
+        print("[DEBUG] RoomWindow.send_heartbeat called")
+        try:
+            if self.socket.connected:
+                self.socket.emit('heartbeat', {
+                    'room_id': self.room_data["room_id"],
+                    'username': self.user_username
+                })
+                logger.debug("Heartbeat sent")
+        except Exception as e:
+            logger.error(f"Error sending heartbeat: {e}")
+
+    def connect_to_server(self):
+        print("[DEBUG] RoomWindow.connect_to_server called")
+        try:
+            if not self.socket.connected:
+                self.socket.connect(API_BASE_URL)
+            
+            # أرسل بيانات الانضمام في كل الحالات
+            self.socket.emit('join', {
                 'room_id': self.room_data["room_id"],
                 'username': self.user_username
             })
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ في الاتصال", f"فشل الاتصال بالخادم: {e}")
+            self.close()
+
+    def connect_vpn(self):
+        # لم يعد هناك زر اتصال يدوي، الاتصال يتم تلقائيًا
+        pass
+
+    def disconnect_vpn(self):
+        if self.vpn_manager:
+            self.vpn_manager.disconnect()
+            self.lbl_vpn_info.setText("غير متصل بـ VPN")
 
     def send_message(self):
+        print("[DEBUG] RoomWindow.send_message called")
         message = self.chat_input.text().strip()
         if message:
-            logger.debug(f"Sending message: {message}")
-            self.socket.emit('send_message', {
-                'room_id': self.room_data["room_id"],
-                'username': self.user_username,
-                'message': message
-            })
-            self.chat_display.append(f"أنت: {message}")
-            self.chat_input.clear()
+            try:
+                self.socket.emit('send_message', {
+                    'room_id': self.room_data["room_id"],
+                    'username': self.user_username,
+                    'message': message
+                })
+                self.chat_display.append(f"أنت: {message}")
+                self.chat_input.clear()
+            except Exception as e:
+                print(f"Error sending message: {e}")
 
     def on_receive_message(self, data):
+        print("[DEBUG] RoomWindow.on_receive_message called")
         username = data['sender']
         message = data['message']
         time = data.get('time', '')
-        logger.debug(f"Received message from {username}: {message}")
+        
+        # عدم عرض الرسائل المرسلة من قبل المستخدم الحالي (لأنها تُعرض عند الإرسال)
         if username != self.user_username:
-            self.chat_display.append(f"[{time}] {username}: {message}" if time else f"{username}: {message}")
+            if time:
+                self.chat_display.append(f"[{time}] {username}: {message}")
+            else:
+                self.chat_display.append(f"{username}: {message}")
 
     def on_user_joined(self, data):
+        print("[DEBUG] RoomWindow.on_user_joined called")
         username = data['username']
-        logger.info(f"User joined: {username}")
         self.chat_display.append(f"🟢 {username} انضم إلى الغرفة")
         if username not in self.players:
             self.players.append(username)
             self.update_players_list()
 
     def on_user_left(self, data):
+        print("[DEBUG] RoomWindow.on_receive_message called")
         username = data['username']
-        logger.info(f"User left: {username}")
         self.chat_display.append(f"🔴 {username} غادر الغرفة")
         if username in self.players:
             self.players.remove(username)
             self.update_players_list()
 
     def on_players_update(self, data):
+        logger.info(f"تحديث قائمة اللاعبين: {data}")
         self.players = data.get('players', [])
-        logger.info(f"Players updated: {len(self.players)} players")
+        logger.info(f"اللاعبون في الغرفة: {self.players}")
         self.update_players_list()
 
     def update_players_list(self):
+        print("[DEBUG] RoomWindow.on_players_update called")
         self.list_players.clear()
+        logger.info(f"تحديث واجهة قائمة اللاعبين: {len(self.players)} لاعبين")
         for player in self.players:
             self.list_players.addItem(f"🟢 {player}")
-        title = _("ui.room.window_title", "غرفة اللعب") + f" - {len(self.players)} لاعبين" if Translator.get_instance().current_language == "ar" else f"Game Room - {len(self.players)} players"
-        self.setWindowTitle(title)
+        # self.setWindowTitle(f"غرفة اللعب - {len(self.players)} لاعبين")
+        # إضافة رسالة في الشات عند تحديث قائمة اللاعبين
         self.chat_display.append(f"📋 تم تحديث قائمة اللاعبين: {', '.join(self.players)}")
 
     def start_game(self):
-        logger.info("Starting game")
-        self.socket.emit('start_game', {'room_id': self.room_data["room_id"]})
+        try:
+            self.socket.emit('start_game', {'room_id': self.room_data["room_id"]})
+        except Exception as e:
+            print(f"Error starting game: {e}")
 
     def on_game_started(self, data):
-        logger.info("Game started")
         QMessageBox.information(self, "بدء اللعبة", "تم بدء اللعبة!")
 
     def leave_room(self):
-        logger.info("User initiated room leave")
+        print("[DEBUG] RoomWindow.closeEvent called")
+        
         if self.vpn_manager:
-            self.progress_window.show_progress()
-            self.vpn_manager.disconnect(cleanup=True)
-        else:
-            self.close()
+            self.vpn_manager.disconnect()
+            self.lbl_vpn_info.setText("غير متصل بـ VPN")
+        try:
+            self.socket.emit('leave', {
+                'room_id': self.room_data["room_id"],
+                'username': self.user_username
+            })
+        except Exception as e:
+            print(f"Error leaving room: {e}")
+        self.close()
 
     def closeEvent(self, event):
-        logger.info("Room window close event")
-        # Cancel the timeout timer if it's running
-        if hasattr(self, 'connection_timer') and self.connection_timer and self.connection_timer.isActive():
-            self.connection_timer.stop()
-            
-        if hasattr(self, 'heartbeat_timer') and self.heartbeat_timer.isActive():
+        # Stop the heartbeat timer
+        if self.heartbeat_timer.isActive():
             self.heartbeat_timer.stop()
-
+            
         if self.vpn_manager:
-            logger.info("Disconnecting VPN before closing")
-            self.progress_window.show_progress()
-            self.vpn_manager.disconnect(cleanup=True)
-        else:
-            try:
-                if self.socket.connected:
-                    logger.info("Emitting leave event")
-                    self.socket.emit('leave', {
-                        'room_id': self.room_data["room_id"],
-                        'username': self.user_username
-                    })
-                    self.socket.disconnect()
-            except Exception as e:
-                logger.error(f"Error during socket disconnect: {e}")
-                
-            self.room_closed.emit()
-            event.accept()
+            self.vpn_manager.disconnect()
+        try:
+            self.socket.emit('leave', {
+                'room_id': self.room_data["room_id"],
+                'username': self.user_username
+            })
+            # self.socket.disconnect()
+        except Exception as e:
+            print(f"Error closing connection: {e}")
+        self.room_closed.emit()
+        self.players.clear()
+
+        event.accept()
