@@ -35,23 +35,29 @@ class Friendship(db.Model):
     )
     
 class Room(db.Model):
+    __tablename__ = 'room'
+    __mapper_args__ = {'confirm_deleted_rows': False}
+    
     id              = db.Column(db.Integer, primary_key=True)
-    name            = db.Column(db.String(100), nullable=False)
-    owner_username = db.Column(db.String(100), nullable=False)  # استخدام owner_username بدلاً من owner_email
-    description     = db.Column(db.String(255), default="")
+    name            = db.Column(db.String(100), unique=True, nullable=False)
+    owner_username  = db.Column(db.String(100), nullable=False)
+    description     = db.Column(db.Text)
     is_private      = db.Column(db.Boolean, default=False)
-    password        = db.Column(db.String(100), default="")
+    password        = db.Column(db.String(100))
     max_players     = db.Column(db.Integer, default=8)
-    current_players = db.Column(db.Integer, default=1)
+    current_players = db.Column(db.Integer, default=0)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
 class RoomPlayer(db.Model):
     __tablename__ = 'room_player'
-
+    __mapper_args__ = {'confirm_deleted_rows': False}
+    
     id = db.Column(db.Integer, primary_key=True)
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
     player_username = db.Column(db.String(100), nullable=False)
-    is_host = db.Column(db.Boolean, default=False)
     username = db.Column(db.String(100), nullable=False)
+    is_host = db.Column(db.Boolean, default=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
         db.UniqueConstraint('room_id', 'player_username', name='unique_player_in_room'),
@@ -59,8 +65,11 @@ class RoomPlayer(db.Model):
 
 
 class ChatMessage(db.Model):
+    __tablename__ = 'chat_message'
+    __mapper_args__ = {'confirm_deleted_rows': False}
+    
     id        = db.Column(db.Integer, primary_key=True)
     room_id   = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
-    sender    = db.Column(db.String(100), nullable=False)
+    username  = db.Column(db.String(100), nullable=False)
     message   = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
