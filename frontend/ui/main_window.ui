@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>800</width><height>600</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>القائمة الرئيسية</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainLayout">
+
+    <item>
+     <widget class="QLabel" name="lbl_welcome">
+      <property name="text">
+       <string>مرحباً، المستخدم</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="styleSheet">
+       <string>font-size: 20px; font-weight: bold;</string>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QScrollArea" name="scrollArea">
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="scrollAreaWidgetContents">
+       <layout class="QVBoxLayout" name="roomsLayout"/>
+      </widget>
+     </widget>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout">
+      <item>
+       <widget class="QPushButton" name="btn_create">
+        <property name="text">
+         <string>➕ إنشاء غرفة</string>
+        </property>
+      </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_logout">
+        <property name="text">
+         <string>🚪 تسجيل خروج</string>
+        </property>
+      </widget>
+      </item>
+     </layout>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout">
+      <item>
+       <widget class="QPushButton" name="btn_friends">
+        <property name="text">
+         <string>👥 الأصدقاء</string>
+        </property>
+      </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_add_friend">
+        <property name="text">
+         <string>➕ إضافة صديق</string>
+        </property>
+      </widget>
+      </item>
+     </layout>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout">
+      <item>
+       <widget class="QPushButton" name="btn_settings">
+        <property name="text">
+         <string>⚙️ الإعدادات</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

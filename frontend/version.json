@@ -1,0 +1,8 @@
+{
+    "version": "1.0.0",
+    "update_url": "http://31.220.80.192:5000/updates",
+    "force_update": false,
+    "changelog": {
+        "1.0.0": "الإصدار الأول"
+    }
+} 

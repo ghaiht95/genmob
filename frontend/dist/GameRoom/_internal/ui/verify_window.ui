@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>VerifyWindow</class>
+ <widget class="QDialog" name="VerifyWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>300</width><height>180</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>التحقق من الكود</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="label_instruction">
+     <property name="text">
+      <string>أدخل رمز التحقق الذي تم إرساله إلى بريدك</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="input_code">
+     <property name="placeholderText">
+      <string>رمز التحقق</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="btn_verify">
+     <property name="text">
+      <string>تحقق</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="btn_resend">
+     <property name="text">
+      <string>إعادة إرسال الكود</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

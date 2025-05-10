@@ -1,0 +1,63 @@
+/* Room Widget Styles */
+
+/* List View Mode */
+RoomWidget[viewMode="list"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #fdfdfd;
+}
+
+RoomWidget[viewMode="list"] QPushButton {
+    background-color: #3498db;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 6px;
+}
+
+RoomWidget[viewMode="list"] QPushButton:hover {
+    background-color: #2980b9;
+}
+
+/* Grid View Mode */
+RoomWidget[viewMode="grid"] {
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+RoomWidget[viewMode="grid"] QPushButton {
+    background-color: #2980b9;
+    color: white;
+    padding: 4px;
+    border-radius: 5px;
+}
+
+RoomWidget[viewMode="grid"] QPushButton:hover {
+    background-color: #3498db;
+}
+
+/* Common Styles */
+RoomWidget QLabel[name="name"] {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+RoomWidget QLabel[name="players"] {
+    font-size: 12px;
+}
+
+RoomWidget QLabel[name="type"] {
+    font-size: 12px;
+}
+
+RoomWidget QLabel[name="description"] {
+    color: gray;
+    font-size: 12px;
+}
+
+RoomWidget QLabel[name="owner"] {
+    font-size: 12px;
+    color: #666;
+} 

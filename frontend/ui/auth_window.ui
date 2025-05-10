@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AuthWindow</class>
+ <widget class="QMainWindow" name="AuthWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>500</width><height>500</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>تسجيل الدخول / التسجيل</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainLayout">
+    <item>
+     <widget class="QLabel" name="label_title">
+      <property name="text">
+       <string>مرحباً بك في التطبيق</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+
+    <!-- تسجيل الدخول -->
+    <item>
+     <widget class="QGroupBox" name="group_login">
+      <property name="title">
+       <string>تسجيل الدخول</string>
+      </property>
+      <property name="layoutDirection">
+       <enum>Qt::RightToLeft</enum>
+      </property>
+      <layout class="QFormLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_login_email">
+         <property name="text">
+          <string>البريد الإلكتروني:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="login_email"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_login_password">
+         <property name="text">
+          <string>كلمة المرور:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="login_password">
+         <property name="echoMode">
+          <enum>QLineEdit::Password</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QCheckBox" name="remember_me">
+         <property name="text">
+          <string>تذكرني</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QPushButton" name="btn_login">
+         <property name="text">
+          <string>تسجيل الدخول</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QPushButton" name="btn_forgot">
+         <property name="text">
+          <string>نسيت كلمة المرور؟</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+
+    <!-- التسجيل -->
+    <item>
+     <widget class="QGroupBox" name="group_register">
+      <property name="title">
+       <string>إنشاء حساب</string>
+      </property>
+      <property name="layoutDirection">
+       <enum>Qt::RightToLeft</enum>
+      </property>
+      <layout class="QFormLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_reg_username">
+         <property name="text">
+          <string>اسم المستخدم:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="reg_username"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_reg_email">
+         <property name="text">
+          <string>البريد الإلكتروني:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="reg_email"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_reg_password">
+         <property name="text">
+          <string>كلمة المرور:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QLineEdit" name="reg_password">
+         <property name="echoMode">
+          <enum>QLineEdit::Password</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_reg_confirm">
+         <property name="text">
+          <string>تأكيد كلمة المرور:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QLineEdit" name="reg_confirm">
+         <property name="echoMode">
+          <enum>QLineEdit::Password</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QPushButton" name="btn_register">
+         <property name="text">
+          <string>تسجيل</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

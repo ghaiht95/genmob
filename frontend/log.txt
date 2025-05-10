@@ -1,0 +1,46 @@
+[HTTPError] 500 Server Error: INTERNAL SERVER ERROR for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Failed to create VPN hub"
+}
+
+[Status] 500
+[HTTPError] 500 Server Error: INTERNAL SERVER ERROR for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Failed to create VPN hub"
+}
+
+[Status] 500
+[RequestException] ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[RequestException] ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[RequestException] ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[RequestException] ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[HTTPError] 400 Client Error: BAD REQUEST for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Room name already exists"
+}
+
+[Status] 400
+[HTTPError] 500 Server Error: INTERNAL SERVER ERROR for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Failed to create VPN hub"
+}
+
+[Status] 500
+[HTTPError] 500 Server Error: INTERNAL SERVER ERROR for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Failed to create VPN hub"
+}
+
+[Status] 500
+[HTTPError] 500 Server Error: INTERNAL SERVER ERROR for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Failed to create VPN hub"
+}
+
+[Status] 500
+[HTTPError] 500 Server Error: INTERNAL SERVER ERROR for url: http://31.220.80.192:5000/create_room
+[Response text] {
+  "error": "Failed to create VPN hub"
+}
+
+[Status] 500

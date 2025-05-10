@@ -1,0 +1,79 @@
+/* Progress Window Styles */
+
+/* Dark Theme */
+[style="dark"] QWidget {
+    background-color: #2b2b2b;
+    color: #ffffff;
+}
+
+[style="dark"] QProgressBar {
+    border: 2px solid #3d3d3d;
+    border-radius: 5px;
+    text-align: center;
+    background-color: #1e1e1e;
+    min-height: 25px;
+    color: #ffffff;
+}
+
+[style="dark"] QProgressBar::chunk {
+    background-color: #007acc;
+    border-radius: 3px;
+}
+
+[style="dark"] QLabel {
+    color: #ffffff;
+    font-size: 14px;
+    padding: 5px;
+}
+
+/* Light Theme */
+[style="light"] QWidget {
+    background-color: #f5f5f5;
+    color: #333333;
+}
+
+[style="light"] QProgressBar {
+    border: 2px solid #cccccc;
+    border-radius: 5px;
+    text-align: center;
+    background-color: #ffffff;
+    min-height: 25px;
+    color: #333333;
+}
+
+[style="light"] QProgressBar::chunk {
+    background-color: #0078d4;
+    border-radius: 3px;
+}
+
+[style="light"] QLabel {
+    color: #333333;
+    font-size: 14px;
+    padding: 5px;
+}
+
+/* Default Theme */
+QWidget {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+QProgressBar {
+    border: 2px solid #cccccc;
+    border-radius: 5px;
+    text-align: center;
+    background-color: #f0f0f0;
+    min-height: 25px;
+    color: #000000;
+}
+
+QProgressBar::chunk {
+    background-color: #0078d4;
+    border-radius: 3px;
+}
+
+QLabel {
+    color: #000000;
+    font-size: 14px;
+    padding: 5px;
+} 
