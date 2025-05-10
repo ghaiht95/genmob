@@ -4,6 +4,8 @@ from services.softether import SoftEtherVPN
 import random
 import os
 import logging
+import time
+from sqlalchemy.exc import OperationalError
 
 # إعداد السجلات
 logging.basicConfig(level=logging.INFO)
@@ -11,6 +13,34 @@ logger = logging.getLogger(__name__)
 
 rooms_bp = Blueprint('rooms', __name__)
 vpn = SoftEtherVPN()
+
+def retry_on_db_lock(func):
+    """ديكوريتور لإعادة المحاولة عند قفل قاعدة البيانات"""
+    def wrapper(*args, **kwargs):
+        max_retries = 3
+        retry_delay = 0.5  # ثواني
+        
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except OperationalError as e:
+                if "database is locked" in str(e) and attempt < max_retries - 1:
+                    logger.warning(f"Database locked, retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # زيادة وقت الانتظار مع كل محاولة
+                else:
+                    raise
+    return wrapper
+
+@retry_on_db_lock
+def safe_db_operation(operation_func):
+    """تنفيذ عمليات قاعدة البيانات بشكل آمن مع إعادة المحاولة"""
+    try:
+        return operation_func()
+    except Exception as e:
+        logger.error(f"Database operation failed: {e}")
+        db.session.rollback()
+        raise
 
 @rooms_bp.route('/create_room', methods=['POST'])
 def create_room():
@@ -138,62 +168,86 @@ def leave_room():
     if not data.get("room_id") or not data.get("username"):
         return jsonify({"error": "Room ID and username are required"}), 400
 
-    rp = RoomPlayer.query.filter_by(room_id=data["room_id"], player_username=data["username"]).first()
-    room = Room.query.get(data["room_id"])
-
-    if not room:
-        return jsonify({"error": "Room not found"}), 404
-
-    if rp:
-        # حذف مستخدم VPN
-        hub_name = f"room_{room.id}"
-        logger.info(f"Deleting VPN user: {rp.username} from hub: {hub_name}")
-        vpn.delete_user(hub_name, rp.username)
-        db.session.delete(rp)
-        db.session.flush()
-
-    players_left = RoomPlayer.query.filter_by(room_id=room.id).count()
-    room.current_players = players_left
-
-    # إذا كان اللاعب المخرج هو المالك، نقوم بتعيين مالك جديد
-    if rp and rp.is_host:
-        new_host = RoomPlayer.query.filter_by(room_id=room.id).first()
-        if new_host:
-            new_host.is_host = True
-            room.owner_username = new_host.player_username
-
-    # إذا كان آخر لاعب، نقوم بحذف الغرفة
-    if players_left == 0:
-        logger.info(f"Room {room.id} is empty, cleaning up...")
-        try:
-            # حذف هاب VPN
-            hub_name = f"room_{room.id}"
-            vpn.delete_hub(hub_name)
-            logger.info(f"Deleted VPN hub: {hub_name}")
-
-            # حذف رسائل الدردشة
-            ChatMessage.query.filter_by(room_id=room.id).delete()
-            logger.info(f"Deleted chat messages for room: {room.id}")
-
-            # حذف الغرفة
-            db.session.delete(room)
-            logger.info(f"Deleted room: {room.id}")
-        except Exception as e:
-            logger.error(f"Error cleaning up room {room.id}: {e}")
-            return jsonify({"error": "Failed to clean up room"}), 500
-
     try:
-        db.session.commit()
-        logger.info(f"Player {data['username']} successfully left room {data['room_id']}")
-        return jsonify({
-            "message": "left",
-            "is_last_player": players_left == 0,
-            "players_left": players_left
-        }), 200
+        def leave_room_operation():
+            rp = RoomPlayer.query.filter_by(room_id=data["room_id"], player_username=data["username"]).first()
+            room = Room.query.get(data["room_id"])
+
+            if not room:
+                return jsonify({"error": "Room not found"}), 404
+
+            # علامة تشير إلى ما إذا كان هذا آخر لاعب (تأتي من Socket.IO)
+            is_last_player = data.get("is_last_player", False)
+            logger.info(f"Leave room request for {data['username']} from room {data['room_id']} - is_last_player: {is_last_player}")
+
+            if rp:
+                # حذف مستخدم VPN
+                hub_name = f"room_{room.id}"
+                logger.info(f"Deleting VPN user: {rp.username} from hub: {hub_name}")
+                vpn.delete_user(hub_name, rp.username)
+                db.session.delete(rp)
+                db.session.flush()
+
+            # إذا تم التحديد مسبقًا أن هذا آخر لاعب، نحذف الغرفة مباشرة
+            if is_last_player:
+                logger.info(f"Last player left room {room.id} - cleaning up room")
+                # نحتفظ بمحول الشبكة للاستخدام المستقبلي - نستخدم اسم ثابت "VPN"
+                adapter_name = "VPN"
+                if vpn.adapter_exists(adapter_name):
+                    logger.info(f"Keeping VPN adapter {adapter_name} for future use")
+                
+                # حذف هاب VPN
+                hub_name = f"room_{room.id}"
+                logger.info(f"Deleting VPN hub: {hub_name}")
+                vpn.delete_hub(hub_name)
+                logger.info(f"Successfully deleted VPN hub: {hub_name}")
+                
+                # حذف رسائل الدردشة والغرفة
+                ChatMessage.query.filter_by(room_id=room.id).delete()
+                db.session.delete(room)
+                logger.info(f"Successfully deleted room {room.id} and its chat messages")
+            else:
+                # إذا لم نكن متأكدين، نتحقق من عدد اللاعبين المتبقين
+                players_left = RoomPlayer.query.filter_by(room_id=room.id).count()
+                room.current_players = players_left
+
+                if players_left == 0:
+                    # نحتفظ بمحول الشبكة للاستخدام المستقبلي - نستخدم اسم ثابت "VPN"
+                    adapter_name = "VPN"
+                    if vpn.adapter_exists(adapter_name):
+                        logger.info(f"Keeping VPN adapter {adapter_name} for future use")
+                    
+                    # حذف هاب VPN
+                    hub_name = f"room_{room.id}"
+                    logger.info(f"Deleting VPN hub: {hub_name}")
+                    vpn.delete_hub(hub_name)
+                    logger.info(f"Successfully deleted VPN hub: {hub_name}")
+                    
+                    # حذف رسائل الدردشة والغرفة
+                    ChatMessage.query.filter_by(room_id=room.id).delete()
+                    db.session.delete(room)
+                    logger.info(f"Successfully deleted room {room.id} and its chat messages")
+                else:
+                    if rp and rp.is_host:
+                        new_host = RoomPlayer.query.filter_by(room_id=room.id).first()
+                        if new_host:
+                            new_host.is_host = True
+                            room.owner_username = new_host.player_username
+                            logger.info(f"New host assigned: {new_host.player_username}")
+
+            db.session.commit()
+            logger.info(f"Player {data['username']} successfully left room {data['room_id']}")
+            return jsonify({
+                "message": "left",
+                "is_last_player": is_last_player,
+                "players_left": players_left if not is_last_player else 0
+            }), 200
+
+        return safe_db_operation(leave_room_operation)
+
     except Exception as e:
-        logger.error(f"Error committing changes: {e}")
-        db.session.rollback()
-        return jsonify({"error": "Database error"}), 500
+        logger.error(f"Error in leave_room: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @rooms_bp.route('/rooms', methods=['GET'])
 def get_rooms():

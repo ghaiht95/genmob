@@ -9,6 +9,7 @@ from config import Config
 from routes.auth import auth_bp
 from routes.rooms import rooms_bp
 from routes.friends import friends_bp
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -95,19 +96,79 @@ def handle_join(data):
 def handle_leave(data):
     room_id = str(data['room_id'])
     username = data['username']
-    leave_room(room_id)
-
+    is_last_player = data.get('is_last_player', False)
+    
+    print(f"[DEBUG] Player {username} leaving room {room_id}, is_last_player: {is_last_player}")
+    
     # حذف اللاعب من قاعدة البيانات
     player = RoomPlayer.query.filter_by(room_id=room_id, player_username=username).first()
     if player:
+        is_host = player.is_host  # حفظ قيمة is_host قبل حذف اللاعب
         db.session.delete(player)
-        db.session.commit()
-        print(f"Removed player {username} from RoomPlayer table.")
-
-
+        try:
+            db.session.flush()  # نستخدم flush بدلاً من commit للتحقق من عدد اللاعبين المتبقين
+            print(f"Removed player {username} from RoomPlayer table.")
+            
+            # التحقق من عدد اللاعبين المتبقين
+            players_left = RoomPlayer.query.filter_by(room_id=room_id).count()
+            room = Room.query.get(room_id)
+            
+            if room:
+                room.current_players = players_left
+                
+                if is_last_player or players_left == 0:
+                    # حذف هاب VPN عند خروج آخر لاعب
+                    hub_name = f"room_{room_id}"
+                    print(f"Deleting VPN hub: {hub_name} - Room is empty")
+                    
+                    try:
+                        # استخدام API للتنظيف الكامل
+                        api_url = f"{os.getenv('API_BASE_URL', 'http://localhost:5000')}/leave_room"
+                        response = requests.post(
+                            api_url, 
+                            json={
+                                "room_id": room_id,
+                                "username": username,
+                                "is_last_player": True
+                            },
+                            timeout=5
+                        )
+                        print(f"✅ Room {room_id} cleaned up via API, status: {response.status_code}")
+                        
+                        # حذف الغرفة من قاعدة البيانات
+                        ChatMessage.query.filter_by(room_id=room_id).delete()
+                        db.session.delete(room)
+                        print(f"✅ Room {room_id} deleted from database")
+                    except Exception as e:
+                        print(f"❌ Error calling cleanup API: {e}")
+                        # يمكن إضافة تنظيف يدوي هنا
+                        try:
+                            ChatMessage.query.filter_by(room_id=room_id).delete()
+                            db.session.delete(room)
+                            print(f"✅ Manual cleanup of room {room_id} successful")
+                        except Exception as inner_e:
+                            print(f"❌❌ Error during manual cleanup: {inner_e}")
+                else:
+                    # إذا كان اللاعب المخرج هو المالك، نقوم بتعيين مالك جديد
+                    if is_host:
+                        new_host = RoomPlayer.query.filter_by(room_id=room_id).first()
+                        if new_host:
+                            new_host.is_host = True
+                            room.owner_username = new_host.player_username
+                            print(f"✅ New host assigned: {new_host.player_username}")
+            
+            db.session.commit()
+            print(f"✅ Database changes committed successfully")
+            
+        except Exception as e:
+            print(f"❌ Error during player removal: {e}")
+            db.session.rollback()
+            return
+    
+    # إرسال إشعارات للاعبين الآخرين
     emit('user_left', {'username': username}, room=room_id)
-
-    # الآن لما نحدث اللاعبين، نسترجعهم من القاعدة
+    
+    # تحديث قائمة اللاعبين
     players = get_players_for_room(room_id)
     print(f"Players for room {room_id}: {players}")
     emit('update_players', {'players': players}, room=room_id)
